@@ -15,12 +15,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && rm -rf /var/lib/apt/lists/*
 
 # Create runtime dirs
-RUN mkdir -p /var/spool/postfix/opendkim /var/spool/postfix/opendmarc \
-    /var/mail /var/mail/vhosts /var/log/supervisor \
-    /etc/opendkim/keys \
-    /etc/dovecot/conf.d /etc/dovecot/sql \
-    /etc/postfix/templates /etc/dovecot/templates /etc/opendmarc/templates \
-    /etc/postfix/sqlite
+RUN mkdir -p /var/spool/postfix/opendkim /var/spool/postfix/opendmarc /var/mail /var/mail/vhosts /var/log/supervisor /etc/opendkim/keys /etc/dovecot/conf.d /etc/dovecot/templates /etc/postfix/templates /etc/postfix/mysql /etc/opendmarc/templates
+COPY fullchain.pem /etc/mail.fullchain.pem
+COPY privkey.pem /etc/mail.privkey.pem
+
 
 # Dedicated vmail user/group (static UID/GID so host can chown)
 RUN groupadd -g 150 vmail && useradd -g 150 -u 150 -d /var/mail/vhosts -M -s /usr/sbin/nologin vmail
@@ -32,11 +30,11 @@ RUN chown -R opendkim:postfix /var/spool/postfix/opendkim && \
     chmod 750 /var/spool/postfix/opendkim /var/spool/postfix/opendmarc
 
 # Copy templates and scripts
-COPY entrypoint.sh /entrypoint.sh
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY entrypoint.sqlite.sh /entrypoint.sqlite.sh
+COPY templates/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Templates (REPLACE some, add new)
-COPY templates/postfix-main.cf      /etc/postfix/templates/main.cf
+COPY templates/postfix-main.sqlite.cf      /etc/postfix/templates/main.cf
 COPY templates/postfix-master.cf    /etc/postfix/templates/master.cf
 COPY templates/postfix-sqlite-domains.cf  /etc/postfix/sqlite/virtual-domains.cf
 COPY templates/postfix-sqlite-users.cf    /etc/postfix/sqlite/virtual-users.cf
@@ -57,10 +55,10 @@ COPY templates/opendmarc.conf       /etc/opendmarc/templates/opendmarc.conf
 # SQLite DB schema
 COPY templates/virtual-mail.sql     /etc/dovecot/sql/virtual-mail.sql
 
-RUN chmod +x /entrypoint.sh
+RUN chmod +x /entrypoint.sqlite.sh
 
 EXPOSE 25 465 587 993 143 4190
 
 VOLUME ["/etc/letsencrypt", "/etc/opendkim/keys", "/var/mail", "/var/log", "/etc/dovecot/sql"]
 
-CMD ["/entrypoint.sh"]
+CMD ["/entrypoint.sqlite.sh"]

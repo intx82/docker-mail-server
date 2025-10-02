@@ -8,8 +8,9 @@ set -euo pipefail
 : "${ENABLE_OPENDMARC:=true}"
 : "${ENABLE_SPAMASSASSIN:=false}"
 : "${ENABLE_POP3:=false}"
-: "${SSL_CERT:=/etc/letsencrypt/live/${HOSTNAME_FQDN}/fullchain.pem}"
-: "${SSL_KEY:=/etc/letsencrypt/live/${HOSTNAME_FQDN}/privkey.pem}"
+: "${SSL_CERT:=/etc/mail.fullchain.pem}"
+: "${SSL_KEY:=/etc/mail.privkey.pem}"
+: "${INIT_SQL:=/etc/init.mysql.sql}"
 
 # --- MySQL env ---
 : "${MYSQL_HOST:=db}"                 # service name from docker-compose
@@ -26,12 +27,15 @@ set -euo pipefail
 echo "[entrypoint] DOMAIN=${DOMAIN} HOSTNAME_FQDN=${HOSTNAME_FQDN}"
 
 echo "${HOSTNAME_FQDN}" > /etc/mailname
-hostnamectl set-hostname "${HOSTNAME_FQDN}" || true
 
 # --- TLS presence check (same as before) ---
 if [[ ! -s "${SSL_CERT}" || ! -s "${SSL_KEY}" ]]; then
-  echo "WARNING: TLS cert/key not found at ${SSL_CERT} / ${SSL_KEY}."
+  echo "WARNING: TLS cert/key not found at ${SSL_CERT} - ${SSL_KEY} "
 fi
+
+
+mkdir -p /var/mail/vhosts
+mkdir -p /var/log/supervisor
 
 # --- DKIM key generation (same as before) ---
 DKIM_DIR="/etc/opendkim/keys/${DOMAIN}"
@@ -105,6 +109,49 @@ else
   sed -i 's#, unix:/opendmarc/opendmarc.sock##g' /etc/postfix/main.cf || true
 fi
 
+
+wait_for_mysql() {
+  echo "[entrypoint] Waiting for MySQL at ${MYSQL_HOST}:${MYSQL_PORT}..."
+  local i=0
+  while ! mysqladmin ping \
+           -h"${MYSQL_HOST}" -P"${MYSQL_PORT}" \
+           -u"${MYSQL_USER}" -p"${MYSQL_PASSWORD}" \
+           --silent >/dev/null 2>&1; do
+    i=$((i+1))
+    if [ "$i" -ge 60 ]; then
+      echo "ERROR: MySQL not reachable after 60s"
+      exit 1
+    fi
+    sleep 1
+  done
+}
+
+init_mysql_schema() {
+  [ -s "${INIT_SQL}" ] || { echo "[entrypoint] No INIT_SQL at ${INIT_SQL}, skipping DB init"; return; }
+
+  wait_for_mysql
+
+  # Count known tables. If fewer than 3 exist, apply the schema.
+  local count
+  count=$(mysql -N -s \
+    -h"${MYSQL_HOST}" -P"${MYSQL_PORT}" \
+    -u"${MYSQL_USER}" -p"${MYSQL_PASSWORD}" --skip-ssl \
+    -e "SELECT COUNT(*) FROM information_schema.tables
+        WHERE table_schema='${MYSQL_DB}'
+          AND table_name IN ('mail_domains','mail_users','mail_aliases');" 2>/dev/null || echo 0)
+
+  echo "[entrypoint] Found: ${count} tables"
+  if [ "${count}" -lt 3 ]; then
+    echo "[entrypoint] Applying schema from ${INIT_SQL}"
+    mysql -h"${MYSQL_HOST}" -P"${MYSQL_PORT}" -u"${MYSQL_USER}" -p"${MYSQL_PASSWORD}" --skip-ssl < "${INIT_SQL}"
+  else
+    echo "[entrypoint] Schema already present (tables found: ${count}), skipping."
+  fi
+}
+
+
+init_mysql_schema
+
 # --- Optional: seed a default virtual user into MySQL ---
 if [[ -n "${DEFAULT_VUSER}" && -n "${DEFAULT_VPASS}" ]]; then
   if [[ "${DEFAULT_VUSER}" != *"@"* ]]; then
@@ -115,10 +162,10 @@ if [[ -n "${DEFAULT_VUSER}" && -n "${DEFAULT_VPASS}" ]]; then
   DEF_LOCAL="${DEFAULT_VUSER%@*}"
   HASH=$(doveadm pw -s SHA256-CRYPT -p "${DEFAULT_VPASS}")
   mysql -h"${MYSQL_HOST}" -P"${MYSQL_PORT}" -u"${MYSQL_USER}" -p"${MYSQL_PASSWORD}" "${MYSQL_DB}" <<SQL
-INSERT IGNORE INTO virtual_domains(name) VALUES ('${DEF_DOMAIN}');
-INSERT INTO virtual_users(domain_id, email, password)
+INSERT IGNORE INTO mail_domains(name) VALUES ('${DEF_DOMAIN}');
+INSERT INTO mail_users(domain_id, email, password)
   SELECT id, '${DEFAULT_VUSER}', '${HASH}'
-  FROM virtual_domains WHERE name='${DEF_DOMAIN}'
+  FROM mail_domains WHERE name='${DEF_DOMAIN}'
 ON DUPLICATE KEY UPDATE password=VALUES(password);
 SQL
   mkdir -p "${MAIL_ROOT}/${DEF_DOMAIN}/${DEF_LOCAL}/Maildir"/{cur,new,tmp}

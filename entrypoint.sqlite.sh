@@ -19,7 +19,6 @@ echo "[entrypoint] DOMAIN=${DOMAIN} HOSTNAME_FQDN=${HOSTNAME_FQDN}"
 
 # Ensure /etc/mailname matches our FQDN
 echo "${HOSTNAME_FQDN}" > /etc/mailname
-hostnamectl set-hostname "${HOSTNAME_FQDN}" || true
 
 # TLS presence (warn only)
 if [[ ! -s "${SSL_CERT}" || ! -s "${SSL_KEY}" ]]; then
@@ -68,13 +67,13 @@ if [[ -n "${DEFAULT_VUSER}" && -n "${DEFAULT_VPASS}" ]]; then
   DEF_DOMAIN="${DEFAULT_VUSER##*@}"
   DEF_LOCAL="${DEFAULT_VUSER%@*}"
   # Insert domain if missing
-  sqlite3 "${SQL_DB}" "INSERT OR IGNORE INTO virtual_domains(name) VALUES('${DEF_DOMAIN}');"
+  sqlite3 "${SQL_DB}" "INSERT OR IGNORE INTO mail_domains(name) VALUES('${DEF_DOMAIN}');"
   # Hash password via Dovecot
   HASH=$(doveadm pw -s SHA256-CRYPT -p "${DEFAULT_VPASS}")
   # Insert/replace user
   sqlite3 "${SQL_DB}" "
-    INSERT OR REPLACE INTO virtual_users(domain_id, email, password, quota)
-    SELECT id, '${DEFAULT_VUSER}', '${HASH}', NULL FROM virtual_domains WHERE name='${DEF_DOMAIN}';
+    INSERT OR REPLACE INTO mail_users(domain_id, email, password, quota)
+    SELECT id, '${DEFAULT_VUSER}', '${HASH}', NULL FROM mail_domains WHERE name='${DEF_DOMAIN}';
   "
   # Ensure Maildir exists
   mkdir -p "${MAIL_ROOT}/${DEF_DOMAIN}/${DEF_LOCAL}/Maildir"/{cur,new,tmp}

@@ -4,5 +4,5 @@ default_pass_scheme = SHA256-CRYPT
 
 password_query = \
   SELECT email AS user, password \
-  FROM virtual_users \
+  FROM mail_users \
   WHERE email = '%u';

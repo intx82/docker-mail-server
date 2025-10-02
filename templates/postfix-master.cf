@@ -23,7 +23,7 @@ dovecot   unix  -       n       n       -       -       lmtp
 pickup    fifo  n       -       y       60      1       pickup
 cleanup   unix  n       -       y       -       0       cleanup
 qmgr      fifo  n       -       n       300     1       qmgr
-tlsmgr    unix  -       -       y       -       1000    tlsmgr
+tlsmgr    unix  -       -       y       1000    1       tlsmgr
 rewrite   unix  -       -       y       -       -       trivial-rewrite
 bounce    unix  -       -       y       -       0       bounce
 defer     unix  -       -       y       -       0       bounce
@@ -40,3 +40,5 @@ virtual   unix  -       n       n       -       -       virtual
 lmtp      unix  -       -       y       -       -       lmtp
 anvil     unix  -       -       y       -       1       anvil
 scache    unix  -       -       y       -       1       scache
+proxymap   unix  -       -      n       -      -      proxymap
+proxywrite unix  -       -      n       -      1      proxymap

@@ -1,2 +1,2 @@
 dbpath = /etc/dovecot/sql/virtual-mail.db
-query = SELECT email FROM virtual_users WHERE email = '%s';
+query = SELECT email FROM mail_users WHERE email = '%s';
