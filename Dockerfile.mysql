@@ -1,0 +1,60 @@
+FROM debian:bookworm-slim
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Core packages (MySQL variants instead of *-sqlite)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    postfix postfix-pcre postfix-mysql \
+    dovecot-core dovecot-imapd dovecot-lmtpd dovecot-sieve dovecot-managesieved dovecot-mysql \
+    opendkim opendkim-tools \
+    opendmarc \
+    spamassassin spamc \
+    supervisor rsyslog \
+    mariadb-client \
+    ca-certificates tzdata curl nano \
+ && rm -rf /var/lib/apt/lists/*
+
+# Runtime dirs
+RUN mkdir -p /var/spool/postfix/opendkim /var/spool/postfix/opendmarc \
+    /var/mail /var/mail/vhosts /var/log/supervisor \
+    /etc/opendkim/keys \
+    /etc/dovecot/conf.d /etc/dovecot/templates \
+    /etc/postfix/templates /etc/postfix/mysql \
+    /etc/opendmarc/templates
+
+# Dedicated vmail uid/gid
+RUN groupadd -g 150 vmail && useradd -g 150 -u 150 -d /var/mail/vhosts -M -s /usr/sbin/nologin vmail
+RUN chown -R vmail:vmail /var/mail/vhosts
+
+# Postfix ↔ DKIM/DMARC sockets
+RUN chown -R opendkim:postfix /var/spool/postfix/opendkim && \
+    chown -R opendmarc:postfix /var/spool/postfix/opendmarc && \
+    chmod 750 /var/spool/postfix/opendkim /var/spool/postfix/opendmarc
+
+# Copy templates and scripts
+COPY entrypoint.sh /entrypoint.sh
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Postfix templates
+COPY templates/postfix-main.cf      /etc/postfix/templates/main.cf
+COPY templates/postfix-master.cf    /etc/postfix/templates/master.cf
+COPY templates/postfix-mysql-domains.cf  /etc/postfix/mysql/virtual-domains.cf
+COPY templates/postfix-mysql-users.cf    /etc/postfix/mysql/virtual-users.cf
+COPY templates/postfix-mysql-aliases.cf  /etc/postfix/mysql/virtual-aliases.cf
+
+# Dovecot templates
+COPY templates/dovecot-10-mail.conf /etc/dovecot/templates/10-mail.conf
+COPY templates/dovecot-10-auth.conf /etc/dovecot/templates/10-auth.conf
+COPY templates/dovecot-10-master.conf /etc/dovecot/templates/10-master.conf
+COPY templates/dovecot-10-ssl.conf  /etc/dovecot/templates/10-ssl.conf
+COPY templates/dovecot-sql-mysql.conf.ext /etc/dovecot/templates/dovecot-sql.conf.ext
+
+# DKIM/DMARC templates
+COPY templates/opendkim.conf        /etc/opendkim/opendkim.conf
+COPY templates/opendkim-trusted.hosts /etc/opendkim/trusted.hosts
+COPY templates/opendmarc.conf       /etc/opendmarc/templates/opendmarc.conf
+
+RUN chmod +x /entrypoint.sh
+
+EXPOSE 25 465 587 993 143 4190
+VOLUME ["/etc/letsencrypt", "/etc/opendkim/keys", "/var/mail", "/var/log"]
+CMD ["/entrypoint.sh"]

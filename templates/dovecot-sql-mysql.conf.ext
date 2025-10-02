@@ -1,0 +1,12 @@
+driver = mysql
+connect = host=__MYSQL_HOST__ port=__MYSQL_PORT__ dbname=__MYSQL_DB__ user=__MYSQL_USER__ password=__MYSQL_PASSWORD__ ssl=__MYSQL_SSL__
+
+default_pass_scheme = SHA256-CRYPT
+
+password_query = \
+  SELECT email AS user, password \
+  FROM virtual_users \
+  WHERE email = '%u';
+
+# Static userdb: vmail owns maildirs
+# (10-auth.conf already sets userdb static to uid/gid vmail and home=/var/mail/vhosts/%d/%n)

@@ -1,0 +1,5 @@
+hosts = __MYSQL_HOST__:__MYSQL_PORT__
+user = __MYSQL_USER__
+password = __MYSQL_PASSWORD__
+dbname = __MYSQL_DB__
+query = SELECT name FROM virtual_domains WHERE name = '%s';

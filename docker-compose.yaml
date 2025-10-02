@@ -1,0 +1,50 @@
+version: "3.8"
+services:
+  # db:
+  #   image: mariadb:11
+  #   restart: unless-stopped
+  #   environment:
+  #     MYSQL_DATABASE: mailserver
+  #     MYSQL_USER: mailuser
+  #     MYSQL_PASSWORD: mailpass
+  #     MYSQL_ROOT_PASSWORD: changeme_root
+  #   volumes:
+  #     - ./db-data:/var/lib/mysql
+  #     - ./db-init:/docker-entrypoint-initdb.d  # put schema.sql here to auto-init
+  #   command: ["mysqld","--character-set-server=utf8mb4","--collation-server=utf8mb4_unicode_ci"]
+
+  mail:
+    build: .
+    container_name: mail
+    restart: unless-stopped
+    depends_on:
+      - db
+    ports:
+      - "25:25"
+      - "465:465"
+      - "587:587"
+      - "993:993"
+      - "143:143"
+      - "4190:4190"
+    environment:
+      DOMAIN: "example.com"
+      HOSTNAME_FQDN: "mail.example.com"
+      DKIM_SELECTOR: "mail2025"
+      ENABLE_OPENDMARC: "true"
+      ENABLE_SPAMASSASSIN: "false"
+
+      MYSQL_HOST: "db"
+      MYSQL_PORT: "3306"
+      MYSQL_DB:   "mailserver"
+      MYSQL_USER: "mailuser"
+      MYSQL_PASSWORD: "mailpass"
+      MYSQL_SSL: "false"   # set true only if you configure TLS on db
+
+      # Optional seed:
+      DEFAULT_VUSER: "alice@example.com"
+      DEFAULT_VPASS: "change_me"
+    volumes:
+      - ./data/mail:/var/mail
+      - ./data/log:/var/log
+      - ./data/opendkim:/etc/opendkim/keys
+      - /etc/letsencrypt:/etc/letsencrypt:ro

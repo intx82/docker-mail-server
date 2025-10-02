@@ -1,0 +1,2 @@
+dbpath = /etc/dovecot/sql/virtual-mail.db
+query = SELECT name FROM virtual_domains WHERE name = '%s';
