@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     spamassassin spamc \
     supervisor rsyslog \
     mariadb-client \
-    ca-certificates tzdata curl nano readline-common\
+    ca-certificates tzdata curl nano readline-common procps\
  && rm -rf /var/lib/apt/lists/*
 
 # Runtime dirs

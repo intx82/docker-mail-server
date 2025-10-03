@@ -103,8 +103,8 @@ chown root:dovecot /etc/dovecot/dovecot-sql.conf.ext
 
 # --- OpenDMARC toggle (same as before) ---
 if [[ "${ENABLE_OPENDMARC}" == "true" ]]; then
-  sed -e "s/__HOSTNAME_FQDN__/${HOSTNAME_FQDN}/g" \
-      /etc/opendmarc/templates/opendmarc.conf > /etc/opendmarc/opendmarc.conf
+  sed -e "s/__HOSTNAME_FQDN__/${HOSTNAME_FQDN}/g" /etc/opendmarc/templates/opendmarc.conf > /etc/opendmarc/opendmarc.conf
+  ln -s /etc/opendmarc.conf /etc/opendmarc/opendmarc.conf
 else
   sed -i 's#, unix:/opendmarc/opendmarc.sock##g' /etc/postfix/main.cf || true
 fi
